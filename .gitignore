@@ -1,0 +1,11 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Ignore locally-built binaries.
+lb112xutil-*
+SHA*SUM.txt

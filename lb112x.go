@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-type General struct {
+type GeneralInfo struct {
 	Model             string `json:"model"`
 	VersionMajor      int    `json:"verMajor"`
 	VersionMinor      int    `json:"verMinor"`
@@ -27,18 +27,18 @@ type General struct {
 	Temperature       int    `json:"devTemperature"`
 }
 
-type Power struct {
+type PowerInfo struct {
 	DeviceTempCritical bool   `json:"deviceTempCritical"`
 	ResetRequired      string `json:"resetRequired"`
 }
 
-type Session struct {
+type SessionInfo struct {
 	UserRole      string `json:"userRole"`
 	Language      string `json:"lang"`
 	SecurityToken string `json:"secToken"`
 }
 
-type SignalStrenth struct {
+type SignalStrenthInfo struct {
 	RSSI int `json:"rssi"`
 	RSCP int `json:"rscp"`
 	ECIO int `json:"ecio"`
@@ -48,18 +48,18 @@ type SignalStrenth struct {
 	SINR int `json:"SINR"`
 }
 
-type WWAN struct {
-	IP                     string        `json:"IP"`
-	IPv6                   string        `json:"IPv6"`
-	RegisterNetworkDisplay string        `json:"registerNetworkDisplay"`
-	SignalStrenth          SignalStrenth `json:"signalStrength"`
+type WWANInfo struct {
+	IP                     string            `json:"IP"`
+	IPv6                   string            `json:"IPv6"`
+	RegisterNetworkDisplay string            `json:"registerNetworkDisplay"`
+	SignalStrenth          SignalStrenthInfo `json:"signalStrength"`
 }
 
 type APIModel struct {
-	General General `json:"general"`
-	Power   Power   `json:"power"`
-	Session Session `json:"session"`
-	WWAN    WWAN    `json:"wwan"`
+	General GeneralInfo `json:"general"`
+	Power   PowerInfo   `json:"power"`
+	Session SessionInfo `json:"session"`
+	WWAN    WWANInfo    `json:"wwan"`
 }
 
 // Client for communicating with the LB112X API.
@@ -87,7 +87,7 @@ func (c *Client) Poll() (*APIModel, error) {
 }
 
 // GetSession information from the LB112X API.
-func (c *Client) GetSession() (*Session, error) {
+func (c *Client) GetSession() (*SessionInfo, error) {
 	model, err := c.Poll()
 	if err != nil {
 		return nil, err

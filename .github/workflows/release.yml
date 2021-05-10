@@ -1,0 +1,29 @@
+name: Publish Binaries on Release
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  release-lb112xutil:
+    name: Release lb112xutil
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build lb112xutil
+        run: make all
+      - name: Release lb112xutil
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            lb112xutil-darwin-amd64
+            lb112xutil-linux-amd64
+            lb112xutil-linux-arm6
+            lb112xutil-linux-arm7
+            lb112xutil-linux-386
+            SHA1SUM.txt
+            SHA256SUM.txt
