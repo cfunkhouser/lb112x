@@ -2,70 +2,145 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
-	"text/tabwriter"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/urfave/cli/v2"
+	"gopkg.in/yaml.v2"
 
 	"github.com/cfunkhouser/lb112x"
+	"github.com/cfunkhouser/lb112x/export"
 )
+
+var (
+	// Version of lb112xutil. Set at build time to something meaningful.
+	Version = "development"
+
+	versionMetric = prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "lb112x_exporter_version",
+		Help: "Version information about this binary",
+		ConstLabels: map[string]string{
+			"version": Version,
+		},
+	})
+
+	defaultLB112XDeviceURL    = "http://192.168.5.1"
+	defaultPromMetricsAddress = ":9112"
+)
+
+func parseFormatter(c *cli.Context) (formatter, error) {
+	f := c.String("format")
+	switch f {
+	case "", "human":
+		return human, nil
+	}
+	return human, fmt.Errorf("unsupported format %q", f)
+}
+
+func stat(c *cli.Context) error {
+	url := c.String("url")
+	password := c.String("password")
+	if url == "" || password == "" {
+		return cli.Exit("URL and password required", 1)
+	}
+	client := lb112x.New(url, password)
+	if err := client.Authenticate(); err != nil {
+		return cli.Exit(err, 1)
+	}
+	m, err := client.Poll()
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+	format, err := parseFormatter(c)
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+	format(os.Stdout, m)
+	return nil
+}
+
+func loadConfig(c *cli.Context) (*export.Config, error) {
+	f, err := os.Open(c.String("config"))
+	if err != nil {
+		return nil, err
+	}
+	var cfg export.Config
+	if err := yaml.NewDecoder(f).Decode(&cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func serveExporter(c *cli.Context) error {
+	r := prometheus.NewRegistry()
+	if err := r.Register(versionMetric); err != nil {
+		return err
+	}
+	cfg, err := loadConfig(c)
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+	exporter, err := export.New(cfg)
+	if err != nil {
+		return cli.Exit(err, 1)
+	}
+
+	versionMetric.Set(1.0)
+	http.Handle("/metrics", promhttp.HandlerFor(r, promhttp.HandlerOpts{}))
+	http.Handle("/scrape", exporter)
+	return http.ListenAndServe(c.String("listen"), nil)
+}
 
 func main() {
 	app := &cli.App{
-		Name:  "lb112xutil",
-		Usage: "Utility for woring with Netgear LB112X LTE Modems",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Required:   true,
-				Value:      "http://192.168.5.1",
-				Name:       "url",
-				Usage:      "URL at which the modem API is found.",
-				HasBeenSet: true,
-				EnvVars:    []string{"LB112X_URL"},
-			},
-			&cli.StringFlag{
-				Required:    true,
-				Name:        "password",
-				Usage:       "Admin password for the modem web API.",
-				DefaultText: "HIDDEN",
-				EnvVars:     []string{"LB112X_ADMIN_PASSWORD"},
-			},
-		},
+		Name:    "lb112xutil",
+		Usage:   "Utility for woring with Netgear LB112X LTE Modems",
+		Version: Version,
 		Commands: []*cli.Command{
 			{
-				Name:    "status",
+				Name: "status",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Required:   true,
+						Value:      defaultLB112XDeviceURL,
+						Name:       "url",
+						Usage:      "URL at which the modem API is found.",
+						HasBeenSet: true,
+						EnvVars:    []string{"LB112X_URL"},
+					},
+					&cli.StringFlag{
+						Required:    true,
+						Name:        "password",
+						Usage:       "Admin password for the modem web API.",
+						DefaultText: "HIDDEN",
+						EnvVars:     []string{"LB112X_ADMIN_PASSWORD"},
+					},
+				},
 				Aliases: []string{"stat"},
 				Usage:   "Display status of a LB112X device.",
-				Action: func(c *cli.Context) error {
-					url := c.String("url")
-					password := c.String("password")
-					if url == "" || password == "" {
-						return cli.Exit("URL and password required", 1)
-					}
-					client := lb112x.New(url, password)
-					if err := client.Authenticate(); err != nil {
-						return cli.Exit(err, 1)
-					}
-					m, err := client.Poll()
-					if err != nil {
-						return cli.Exit(err, 1)
-					}
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					fmt.Fprintln(w, "Device\t")
-					fmt.Fprintf(w, " Model:\t%v\n", m.General.Model)
-					fmt.Fprintf(w, " IMEI:\t%v\n", m.General.IMEI)
-					fmt.Fprintln(w, "Network\t")
-					fmt.Fprintf(w, " Name:\t%v\n", m.WWAN.RegisterNetworkDisplay)
-					fmt.Fprintf(w, " IP:\t%v\n", m.WWAN.IP)
-					fmt.Fprintf(w, " IPv6:\t%v\n", m.WWAN.IPv6)
-					fmt.Fprintln(w, "Signal\t")
-					fmt.Fprintf(w, " Bars:\t%v\n", m.WWAN.SignalStrenth.Bars)
-					fmt.Fprintf(w, " RSSI:\t%v\n", m.WWAN.SignalStrenth.RSSI)
-					fmt.Fprintf(w, " Temperature:\t%v\u00b0C\n", m.General.Temperature)
-					fmt.Fprintf(w, " Temp Critical:\t%v\n", m.Power.DeviceTempCritical)
-					w.Flush()
-					return nil
+				Action:  stat,
+			},
+			{
+				Name: "export",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "config",
+						Aliases:  []string{"f"},
+						Usage:    "Configuration file for Prometheus Exporter",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:       "listen",
+						Usage:      "Local ip:port from which to serve Prometheus metrics.",
+						Aliases:    []string{"L"},
+						Value:      defaultPromMetricsAddress,
+						HasBeenSet: true,
+					},
 				},
+				Usage:  "Export LB112x device metrics to Prometheus. Blocks until killed.",
+				Action: serveExporter,
 			},
 		},
 	}
