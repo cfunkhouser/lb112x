@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -46,10 +47,11 @@ func stat(c *cli.Context) error {
 		return cli.Exit("URL and password required", 1)
 	}
 	client := lb112x.New(url, password)
-	if err := client.Authenticate(); err != nil {
+	ctx := context.Background()
+	if err := client.Authenticate(ctx); err != nil {
 		return cli.Exit(err, 1)
 	}
-	m, err := client.Poll()
+	m, err := client.Poll(ctx)
 	if err != nil {
 		return cli.Exit(err, 1)
 	}

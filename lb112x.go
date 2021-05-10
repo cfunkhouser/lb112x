@@ -1,6 +1,7 @@
 package lb112x
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -69,8 +70,8 @@ type Client struct {
 }
 
 // Poll the LB112X API.
-func (c *Client) Poll() (*APIModel, error) {
-	r, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%v/api/model.json?internalapi=1", c.url), nil)
+func (c *Client) Poll(ctx context.Context) (*APIModel, error) {
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%v/api/model.json?internalapi=1", c.url), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +88,8 @@ func (c *Client) Poll() (*APIModel, error) {
 }
 
 // GetSession information from the LB112X API.
-func (c *Client) GetSession() (*SessionInfo, error) {
-	model, err := c.Poll()
+func (c *Client) GetSession(ctx context.Context) (*SessionInfo, error) {
+	model, err := c.Poll(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -98,8 +99,8 @@ func (c *Client) GetSession() (*SessionInfo, error) {
 var ErrFailedAuthentication = errors.New("failed to log in")
 
 // Authenticate with the API.
-func (c *Client) Authenticate() error {
-	sess, err := c.GetSession()
+func (c *Client) Authenticate(ctx context.Context) error {
+	sess, err := c.GetSession(ctx)
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,9 @@ func (c *Client) Authenticate() error {
 	form := url.Values{}
 	form.Add("token", sess.SecurityToken)
 	form.Add("session.password", c.password)
-	r, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%v/Forms/config", c.url), strings.NewReader(form.Encode()))
+
+	formURL := fmt.Sprintf("%v/Forms/config", c.url)
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, formURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return err
 	}

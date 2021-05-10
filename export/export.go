@@ -50,10 +50,10 @@ type deviceExporter struct {
 }
 
 func (e *deviceExporter) update(ctx context.Context) error {
-	if err := e.client.Authenticate(); err != nil {
+	if err := e.client.Authenticate(ctx); err != nil {
 		return err
 	}
-	details, err := e.client.Poll()
+	details, err := e.client.Poll(ctx)
 	if err != nil {
 		return err
 	}
