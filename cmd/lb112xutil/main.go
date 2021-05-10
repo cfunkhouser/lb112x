@@ -142,6 +142,25 @@ func main() {
 				Usage:  "Export LB112x device metrics to Prometheus. Blocks until killed.",
 				Action: serveExporter,
 			},
+			{
+				Name: "testcfg",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "config",
+						Aliases:  []string{"f"},
+						Usage:    "Configuration file for Prometheus Exporter",
+						Required: true,
+					},
+				},
+				Usage: "Test Prometheus exporter configuration.",
+				Action: func(c *cli.Context) error {
+					if _, err := loadConfig(c); err != nil {
+						return err
+					}
+					fmt.Println("OK")
+					return nil
+				},
+			},
 		},
 	}
 
