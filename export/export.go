@@ -72,7 +72,7 @@ func (e *deviceExporter) update(ctx context.Context) error {
 		"fw":    details.General.FirmwareVersion,
 		"sw":    details.General.AppVersion,
 	}).Set(1.0)
-	e.metrics.info.With(prometheus.Labels{
+	e.metrics.netInfo.With(prometheus.Labels{
 		"network": details.WWAN.RegisterNetworkDisplay,
 		"ipv4":    details.WWAN.IP,
 		"ipv6":    details.WWAN.IPv6,
