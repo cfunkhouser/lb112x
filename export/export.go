@@ -18,6 +18,7 @@ type deviceMetrics struct {
 	rssi          prometheus.Gauge
 	numBars       prometheus.Gauge
 	info          *prometheus.GaugeVec
+	netInfo       *prometheus.GaugeVec
 }
 
 func (m *deviceMetrics) register(r prometheus.Registerer) error {
@@ -34,6 +35,9 @@ func (m *deviceMetrics) register(r prometheus.Registerer) error {
 		return err
 	}
 	if err := r.Register(m.numBars); err != nil {
+		return err
+	}
+	if err := r.Register(m.netInfo); err != nil {
 		return err
 	}
 	return nil
@@ -67,6 +71,11 @@ func (e *deviceExporter) update(ctx context.Context) error {
 		"hw":    details.General.HardwareVersion,
 		"fw":    details.General.FirmwareVersion,
 		"sw":    details.General.AppVersion,
+	}).Set(1.0)
+	e.metrics.info.With(prometheus.Labels{
+		"network": details.WWAN.RegisterNetworkDisplay,
+		"ipv4":    details.WWAN.IP,
+		"ipv6":    details.WWAN.IPv6,
 	}).Set(1.0)
 
 	return nil
@@ -112,6 +121,13 @@ func newDeviceExporter(client *lb112x.Client) (*deviceExporter, error) {
 					Help: "Information describing the LB112x Device.",
 				},
 				[]string{"model", "imei", "hw", "fw", "sw"},
+			),
+			netInfo: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: "lb112x_wwan_info",
+					Help: "Information describing the LB112x Device's WWAN interface.",
+				},
+				[]string{"network", "ipv4", "ipv6"},
 			),
 		},
 
