@@ -50,6 +50,9 @@ type deviceExporter struct {
 }
 
 func (e *deviceExporter) update(ctx context.Context) error {
+	if err := e.client.Authenticate(); err != nil {
+		return err
+	}
 	details, err := e.client.Poll()
 	if err != nil {
 		return err
@@ -88,7 +91,7 @@ func newDeviceExporter(client *lb112x.Client) (*deviceExporter, error) {
 			temperature: prometheus.NewGauge(
 				prometheus.GaugeOpts{
 					Name: "lb112x_temperature",
-					Help: "Temperature of the LB112x Device",
+					Help: "Temperature of the LB112x Device in degrees Celcius",
 				},
 			),
 			tempCritical: prometheus.NewGauge(
